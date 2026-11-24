@@ -328,3 +328,353 @@
         
         const viewPlayer = document.getElementById('view-player');
         const viewAdmin = document.getElementById('view-admin');
+        const loginCard = document.getElementById('login-card');
+        const loginForm = document.getElementById('login-form');
+        const loginNameInput = document.getElementById('login-name-input');
+        const resourceEditor = document.getElementById('resource-editor');
+        const activePlayerInitial = document.getElementById('active-player-initial');
+        const activePlayerDisplay = document.getElementById('active-player-display');
+        const changePlayerBtn = document.getElementById('change-player-btn');
+        const resourcesForm = document.getElementById('resources-form');
+        const saveBtn = document.getElementById('save-btn');
+        const lastUpdatedText = document.getElementById('last-updated-text');
+        const playerSummaryCard = document.getElementById('player-summary-card');
+        const summaryGrid = document.getElementById('summary-grid');
+
+        const navPlayerTab = document.getElementById('nav-player-tab');
+        const navAdminTab = document.getElementById('nav-admin-tab');
+        const backToPlayerBtn = document.getElementById('back-to-player-btn');
+        const openAdminModalBtn = document.getElementById('open-admin-modal-btn');
+        const adminLoginModal = document.getElementById('admin-login-modal');
+        const closeAdminModal = document.getElementById('close-admin-modal');
+        const adminLoginForm = document.getElementById('admin-login-form');
+        const adminPasswordInput = document.getElementById('admin-password-input');
+        const adminLogoutBtn = document.getElementById('admin-logout-btn');
+
+        const searchPlayerInput = document.getElementById('search-player-input');
+        const totalPlayersText = document.getElementById('total-players-text');
+        const playersTableBody = document.getElementById('players-table-body');
+        const emptyTableState = document.getElementById('empty-table-state');
+
+        const deleteModal = document.getElementById('delete-modal');
+        const deletePlayerNameSpan = document.getElementById('delete-player-name');
+        const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+        const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+
+        // Bildirim Gösterme
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            const bgClass = type === 'error' ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white';
+            toast.className = `${bgClass} px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all duration-300 transform translate-y-0 opacity-100`;
+            toast.textContent = message;
+            toastContainer.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', '-translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function formatNum(num) {
+            return Number(num || 0).toLocaleString('tr-TR');
+        }
+
+        function normalizePlayerId(name) {
+            return name.trim().toLowerCase()
+                .replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's')
+                .replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c')
+                .replace(/[^a-z0-9]/g, '_');
+        }
+
+        // LocalStorage Veri İşlemleri
+        function getAllPlayers() {
+            try {
+                const data = localStorage.getItem(STORAGE_KEY);
+                return data ? JSON.parse(data) : {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function saveAllPlayers(playersObj) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(playersObj));
+        }
+
+        // Oyuncu Girişi
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const rawName = loginNameInput.value.trim();
+            if (!rawName) return;
+
+            currentPlayerName = rawName;
+            currentPlayerId = normalizePlayerId(rawName);
+
+            activePlayerDisplay.textContent = currentPlayerName;
+            activePlayerInitial.textContent = currentPlayerName.charAt(0).toUpperCase();
+
+            const allPlayers = getAllPlayers();
+            const existing = allPlayers[currentPlayerId];
+
+            if (existing) {
+                document.getElementById('input-hammers').value = existing.hammers ?? 0;
+                document.getElementById('input-greenTubes').value = existing.greenTubes ?? 0;
+                document.getElementById('input-skillTickets').value = existing.skillTickets ?? 0;
+                document.getElementById('input-upgradableSkills').value = existing.upgradableSkills ?? 0;
+                document.getElementById('input-mountKeys').value = existing.mountKeys ?? 0;
+                document.getElementById('input-upgradableMounts').value = existing.upgradableMounts ?? 0;
+                document.getElementById('input-eggs').value = existing.eggs ?? 0;
+                document.getElementById('input-combinableEggs').value = existing.combinableEggs ?? 0;
+
+                if (existing.updatedAt) {
+                    const date = new Date(existing.updatedAt);
+                    lastUpdatedText.textContent = `Son güncelleme: ${date.toLocaleDateString('tr-TR')} ${date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+                }
+                updatePlayerSummary(existing);
+            } else {
+                resourcesForm.reset();
+                lastUpdatedText.textContent = "Yeni kayıt oluşturulacak.";
+                playerSummaryCard.classList.add('hidden');
+            }
+
+            loginCard.classList.add('hidden');
+            resourceEditor.classList.remove('hidden');
+        });
+
+        changePlayerBtn.addEventListener('click', () => {
+            currentPlayerName = "";
+            currentPlayerId = "";
+            loginNameInput.value = "";
+            resourceEditor.classList.add('hidden');
+            loginCard.classList.remove('hidden');
+            loginNameInput.focus();
+        });
+
+        // Kaynak Kaydetme
+        resourcesForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (!currentPlayerId) return;
+
+            const payload = {
+                playerName: currentPlayerName,
+                hammers: Math.max(0, parseInt(document.getElementById('input-hammers').value) || 0),
+                greenTubes: Math.max(0, parseInt(document.getElementById('input-greenTubes').value) || 0),
+                skillTickets: Math.max(0, parseInt(document.getElementById('input-skillTickets').value) || 0),
+                upgradableSkills: Math.max(0, parseInt(document.getElementById('input-upgradableSkills').value) || 0),
+                mountKeys: Math.max(0, parseInt(document.getElementById('input-mountKeys').value) || 0),
+                upgradableMounts: Math.max(0, parseInt(document.getElementById('input-upgradableMounts').value) || 0),
+                eggs: Math.max(0, parseInt(document.getElementById('input-eggs').value) || 0),
+                combinableEggs: Math.max(0, parseInt(document.getElementById('input-combinableEggs').value) || 0),
+                updatedAt: Date.now()
+            };
+
+            const allPlayers = getAllPlayers();
+            allPlayers[currentPlayerId] = payload;
+            saveAllPlayers(allPlayers);
+
+            const now = new Date(payload.updatedAt);
+            lastUpdatedText.textContent = `Son güncelleme: ${now.toLocaleDateString('tr-TR')} ${now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+            updatePlayerSummary(payload);
+            showToast("Kaynaklarınız başarıyla kaydedildi.");
+
+            if (isAdminLoggedIn) {
+                renderAdminTable();
+            }
+        });
+
+        function updatePlayerSummary(data) {
+            const items = [
+                { label: "Çekiç", value: data.hammers, color: "text-white" },
+                { label: "Yeşil Tüp", value: data.greenTubes, color: "text-emerald-400" },
+                { label: "Beceri Bileti", value: data.skillTickets, color: "text-white" },
+                { label: "Yüks. Beceri", value: data.upgradableSkills, color: "text-amber-400" },
+                { label: "Binek Anahtarı", value: data.mountKeys, color: "text-white" },
+                { label: "Yüks. Binek", value: data.upgradableMounts, color: "text-amber-400" },
+                { label: "Yumurta", value: data.eggs, color: "text-white" },
+                { label: "Birleştirilebilir", value: data.combinableEggs, color: "text-amber-400" }
+            ];
+
+            summaryGrid.innerHTML = items.map(item => `
+                <div class="bg-slate-950/80 border border-slate-800/80 rounded-xl p-3">
+                    <div class="text-[11px] text-slate-400 mb-1">${item.label}</div>
+                    <div class="text-sm font-bold ${item.color}">${formatNum(item.value)}</div>
+                </div>
+            `).join('');
+
+            playerSummaryCard.classList.remove('hidden');
+        }
+
+        // Yönetici Modalı İşlemleri
+        openAdminModalBtn.addEventListener('click', () => {
+            adminPasswordInput.value = "";
+            adminLoginModal.classList.remove('hidden');
+            adminLoginModal.classList.add('flex');
+            adminPasswordInput.focus();
+        });
+
+        closeAdminModal.addEventListener('click', () => {
+            adminLoginModal.classList.add('hidden');
+            adminLoginModal.classList.remove('flex');
+        });
+
+        adminLoginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const pass = adminPasswordInput.value.trim();
+
+            if (pass === "admin123") {
+                isAdminLoggedIn = true;
+                adminLoginModal.classList.add('hidden');
+                adminLoginModal.classList.remove('flex');
+                
+                // Görünüm değiştir
+                viewPlayer.classList.add('hidden');
+                viewAdmin.classList.remove('hidden');
+                navAdminTab.classList.add('hidden');
+                navPlayerTab.classList.remove('hidden');
+
+                renderAdminTable();
+                showToast("Yönetici girişi başarılı.");
+            } else {
+                showToast("Hatalı yönetici şifresi!", "error");
+                adminPasswordInput.value = "";
+                adminPasswordInput.focus();
+            }
+        });
+
+        adminLogoutBtn.addEventListener('click', () => {
+            isAdminLoggedIn = false;
+            viewAdmin.classList.add('hidden');
+            viewPlayer.classList.remove('hidden');
+            navPlayerTab.classList.add('hidden');
+            navAdminTab.classList.remove('hidden');
+            showToast("Yönetici oturumu kapatıldı.");
+        });
+
+        backToPlayerBtn.addEventListener('click', () => {
+            viewAdmin.classList.add('hidden');
+            viewPlayer.classList.remove('hidden');
+            navPlayerTab.classList.add('hidden');
+            navAdminTab.classList.remove('hidden');
+        });
+
+        // Yönetici Tablosu Render
+        function renderAdminTable() {
+            const allPlayersObj = getAllPlayers();
+            const list = Object.keys(allPlayersObj).map(key => ({ id: key, ...allPlayersObj[key] }));
+            
+            list.sort((a, b) => (a.playerName || '').localeCompare(b.playerName || '', 'tr'));
+
+            const queryText = searchPlayerInput.value.trim().toLowerCase();
+            const filtered = list.filter(p => (p.playerName || '').toLowerCase().includes(queryText));
+
+            totalPlayersText.textContent = filtered.length;
+
+            if (filtered.length === 0) {
+                playersTableBody.innerHTML = '';
+                emptyTableState.classList.remove('hidden');
+                return;
+            }
+
+            emptyTableState.classList.add('hidden');
+            playersTableBody.innerHTML = filtered.map(player => `
+                <tr class="hover:bg-slate-800/40 transition">
+                    <td class="py-3.5 px-4 font-medium text-white whitespace-nowrap">
+                        <button type="button" class="edit-player-link hover:text-amber-400 transition text-left" data-id="${player.id}">
+                            ${escapeHtml(player.playerName)}
+                        </button>
+                    </td>
+                    <td class="py-3.5 px-3 text-right text-slate-200 font-medium">${formatNum(player.hammers)}</td>
+                    <td class="py-3.5 px-3 text-right text-slate-200">${formatNum(player.skillTickets)}</td>
+                    <td class="py-3.5 px-3 text-right text-amber-400 font-medium">${formatNum(player.upgradableSkills)}</td>
+                    <td class="py-3.5 px-3 text-right text-slate-200">${formatNum(player.mountKeys)}</td>
+                    <td class="py-3.5 px-3 text-right text-amber-400 font-medium">${formatNum(player.upgradableMounts)}</td>
+                    <td class="py-3.5 px-3 text-right text-slate-200">${formatNum(player.eggs)}</td>
+                    <td class="py-3.5 px-3 text-right text-amber-400 font-medium">${formatNum(player.combinableEggs)}</td>
+                    <td class="py-3.5 px-3 text-right text-emerald-400 font-semibold">${formatNum(player.greenTubes)}</td>
+                    <td class="py-3.5 px-4 text-right whitespace-nowrap">
+                        <button type="button" class="delete-player-btn text-xs px-2.5 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition" data-id="${player.id}" data-name="${escapeHtml(player.playerName)}">
+                            Sil
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+
+            // Düzenleme bağlantısı (Yönetici tıkladığında o oyuncunun düzenleme ekranına dönebilir)
+            document.querySelectorAll('.edit-player-link').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const id = btn.getAttribute('data-id');
+                    const player = allPlayersObj[id];
+                    if (player) {
+                        viewAdmin.classList.add('hidden');
+                        viewPlayer.classList.remove('hidden');
+                        navPlayerTab.classList.add('hidden');
+                        navAdminTab.classList.remove('hidden');
+
+                        currentPlayerName = player.playerName;
+                        currentPlayerId = id;
+                        activePlayerDisplay.textContent = currentPlayerName;
+                        activePlayerInitial.textContent = currentPlayerName.charAt(0).toUpperCase();
+
+                        document.getElementById('input-hammers').value = player.hammers ?? 0;
+                        document.getElementById('input-greenTubes').value = player.greenTubes ?? 0;
+                        document.getElementById('input-skillTickets').value = player.skillTickets ?? 0;
+                        document.getElementById('input-upgradableSkills').value = player.upgradableSkills ?? 0;
+                        document.getElementById('input-mountKeys').value = player.mountKeys ?? 0;
+                        document.getElementById('input-upgradableMounts').value = player.upgradableMounts ?? 0;
+                        document.getElementById('input-eggs').value = player.eggs ?? 0;
+                        document.getElementById('input-combinableEggs').value = player.combinableEggs ?? 0;
+
+                        updatePlayerSummary(player);
+                        loginCard.classList.add('hidden');
+                        resourceEditor.classList.remove('hidden');
+                    }
+                });
+            });
+
+            // Silme Butonları
+            document.querySelectorAll('.delete-player-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    playerToDeleteId = btn.getAttribute('data-id');
+                    deletePlayerNameSpan.textContent = btn.getAttribute('data-name');
+                    deleteModal.classList.remove('hidden');
+                    deleteModal.classList.add('flex');
+                });
+            });
+        }
+
+        searchPlayerInput.addEventListener('input', renderAdminTable);
+
+        cancelDeleteBtn.addEventListener('click', () => {
+            playerToDeleteId = null;
+            deleteModal.classList.add('hidden');
+            deleteModal.classList.remove('flex');
+        });
+
+        confirmDeleteBtn.addEventListener('click', () => {
+            if (!playerToDeleteId) return;
+            const allPlayers = getAllPlayers();
+            delete allPlayers[playerToDeleteId];
+            saveAllPlayers(allPlayers);
+
+            showToast("Oyuncu kaydı silindi.");
+            if (currentPlayerId === playerToDeleteId) {
+                changePlayerBtn.click();
+            }
+
+            playerToDeleteId = null;
+            deleteModal.classList.add('hidden');
+            deleteModal.classList.remove('flex');
+            renderAdminTable();
+        });
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
